@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍃 スダチ 3D デバッグ版</title>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(45deg, #2E8B57, #3CB371);
+            height: 100vh;
+            color: white;
+            overflow: hidden;
+        }
+        
+        .debug-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            z-index: 1000;
+            max-width: 300px;
+        }
+        
+        .status {
+            margin-bottom: 5px;
+        }
+        
+        .error { color: #ff4444; }
+        .success { color: #44ff44; }
+        .warning { color: #ffaa44; }
+        
+        .header {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 15px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        
+        button {
+            background: #228B22;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        button:hover { background: #32CD32; }
+        button.active { background: #FF6347; }
+        
+        #canvas { width: 100%; height: 100%; cursor: grab; }
+        #canvas:active { cursor: grabbing; }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 200;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-panel" id="debugPanel">
+        <div class="status" id="statusWebGL">WebGL: 確認中...</div>
+        <div class="status" id="statusThreeJS">Three.js: 確認中...</div>
+        <div class="status" id="statusGLTF">GLTFLoader: 確認中...</div>
+        <div class="status" id="statusModel">モデル: 未読み込み</div>
+        <div class="status" id="statusFPS">FPS: --</div>
+        <div class="status" id="statusError">エラー: なし</div>
+    </div>
+    
+    <div class="header">
+        <h2>🍃 スダチ 3D デバッグ版</h2>
+        <p>問題診断と動作確認用</p>
+    </div>
+    
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>初期化中...</div>
+    </div>
+    
+    <div id="canvas"></div>
+    
+    <div class="controls">
+        <button id="testWebGL">WebGL テスト</button>
+        <button id="testModel">モデル テスト</button>
+        <button id="rotate">🔄 回転</button>
+        <button id="reset">🎯 リセット</button>
+        <button id="downloadLog">📋 ログ</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        // デバッグ用アプリケーション
+        class SudachiDebugApp {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.currentModel = null;
+                this.autoRotate = false;
+                
+                this.debugLog = [];
+                this.stats = { fps: 0, frameCount: 0, lastTime: performance.now() };
+                
+                this.init();
+            }
+            
+            log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] ${message}`;
+                this.debugLog.push(logEntry);
+                console.log(logEntry);
+                
+                // ログの表示上限
+                if (this.debugLog.length > 100) {
+                    this.debugLog.shift();
+                }
+            }
+            
+            updateStatus(id, message, className = '') {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = message;
+                    element.className = `status ${className}`;
+                }
+            }
+            
+            async init() {
+                try {
+                    this.log('🍃 デバッグアプリ初期化開始');
+                    
+                    // WebGL確認
+                    await this.testWebGL();
+                    
+                    // Three.js確認
+                    await this.testThreeJS();
+                    
+                    // シーン設定
+                    await this.setupScene();
+                    
+                    // GLTFLoader確認
+                    await this.testGLTFLoader();
+                    
+                    // イベント設定
+                    this.setupEvents();
+                    
+                    // アニメーション開始
+                    this.animate();
+                    
+                    // テストモデル読み込み
+                    await this.loadTestModel();
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    this.log('✅ 初期化完了');
+                    
+                } catch (error) {
+                    this.log(`❌ 初期化エラー: ${error.message}`, 'error');
+                    this.updateStatus('statusError', `エラー: ${error.message}`, 'error');
+                }
+            }
+            
+            async testWebGL() {
+                return new Promise((resolve, reject) => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                        
+                        if (gl) {
+                            const version = gl.getParameter(gl.VERSION);
+                            const vendor = gl.getParameter(gl.VENDOR);
+                            const renderer = gl.getParameter(gl.RENDERER);
+                            
+                            this.log(`WebGL確認成功: ${version}`);
+                            this.log(`GPU: ${renderer}`);
+                            this.updateStatus('statusWebGL', 'WebGL: ✅ 対応', 'success');
+                            resolve();
+                        } else {
+                            throw new Error('WebGL未対応');
+                        }
+                    } catch (error) {
+                        this.log(`WebGL確認失敗: ${error.message}`);
+                        this.updateStatus('statusWebGL', 'WebGL: ❌ 未対応', 'error');
+                        reject(error);
+                    }
+                });
+            }
+            
+            async testThreeJS() {
+                return new Promise((resolve, reject) => {
+                    try {
+                        if (typeof THREE !== 'undefined') {
+                            this.log(`Three.js確認成功: r${THREE.REVISION}`);
+                            this.updateStatus('statusThreeJS', `Three.js: ✅ r${THREE.REVISION}`, 'success');
+                            resolve();
+                        } else {
+                            throw new Error('Three.js未読み込み');
+                        }
+                    } catch (error) {
+                        this.log(`Three.js確認失敗: ${error.message}`);
+                        this.updateStatus('statusThreeJS', 'Three.js: ❌ 未読み込み', 'error');
+                        reject(error);
+                    }
+                });
+            }
+            
+            async setupScene() {
+                return new Promise((resolve, reject) => {
+                    try {
+                        // シーン
+                        this.scene = new THREE.Scene();
+                        this.scene.background = new THREE.Color(0x2E8B57);
+                        
+                        // カメラ
+                        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                        this.camera.position.set(5, 3, 5);
+                        
+                        // レンダラー
+                        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                        this.renderer.setSize(window.innerWidth, window.innerHeight);
+                        this.renderer.setClearColor(0x2E8B57);
+                        
+                        document.getElementById('canvas').appendChild(this.renderer.domElement);
+                        
+                        // ライト
+                        const light = new THREE.DirectionalLight(0xffffff, 1);
+                        light.position.set(5, 5, 5);
+                        this.scene.add(light);
+                        this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+                        
+                        // テストキューブ
+                        const geometry = new THREE.BoxGeometry(1, 1, 1);
+                        const material = new THREE.MeshLambertMaterial({ color: 0x90EE90 });
+                        const cube = new THREE.Mesh(geometry, material);
+                        this.scene.add(cube);
+                        this.testCube = cube;
+                        
+                        this.log('シーン設定完了');
+                        resolve();
+                    } catch (error) {
+                        this.log(`シーン設定失敗: ${error.message}`);
+                        reject(error);
+                    }
+                });
+            }
+            
+            async testGLTFLoader() {
+                return new Promise((resolve) => {
+                    // GLTFLoaderの動的読み込みテスト
+                    let attempts = 0;
+                    const maxAttempts = 50;
+                    
+                    const checkLoader = () => {
+                        attempts++;
+                        
+                        if (typeof THREE.GLTFLoader !== 'undefined') {
+                            this.log('GLTFLoader確認成功');
+                            this.updateStatus('statusGLTF', 'GLTFLoader: ✅ 利用可能', 'success');
+                            resolve();
+                        } else if (attempts >= maxAttempts) {
+                            this.log('GLTFLoader確認失敗: タイムアウト');
+                            this.updateStatus('statusGLTF', 'GLTFLoader: ❌ 未読み込み', 'error');
+                            
+                            // 手動でスクリプト読み込み試行
+                            this.loadGLTFLoaderScript().then(resolve);
+                        } else {
+                            setTimeout(checkLoader, 100);
+                        }
+                    };
+                    
+                    checkLoader();
+                });
+            }
+            
+            loadGLTFLoaderScript() {
+                return new Promise((resolve) => {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+                    script.onload = () => {
+                        if (typeof THREE.GLTFLoader !== 'undefined') {
+                            this.log('GLTFLoader手動読み込み成功');
+                            this.updateStatus('statusGLTF', 'GLTFLoader: ✅ 手動読み込み', 'success');
+                        } else {
+                            this.log('GLTFLoader手動読み込み失敗');
+                            this.updateStatus('statusGLTF', 'GLTFLoader: ❌ 読み込み失敗', 'error');
+                        }
+                        resolve();
+                    };
+                    script.onerror = () => {
+                        this.log('GLTFLoaderスクリプト読み込みエラー');
+                        this.updateStatus('statusGLTF', 'GLTFLoader: ❌ スクリプトエラー', 'error');
+                        resolve();
+                    };
+                    document.head.appendChild(script);
+                });
+            }
+            
+            async loadTestModel() {
+                try {
+                    if (typeof THREE.GLTFLoader === 'undefined') {
+                        throw new Error('GLTFLoader未利用');
+                    }
+                    
+                    const loader = new THREE.GLTFLoader();
+                    
+                    // まず簡単なモデルから試行
+                    const testModels = [
+                        'sudachi_collection.glb',
+                        'individual_sudachi/sudachi_1.glb'
+                    ];
+                    
+                    for (const modelPath of testModels) {
+                        try {
+                            this.log(`モデル読み込み試行: ${modelPath}`);
+                            
+                            await new Promise((resolve, reject) => {
+                                loader.load(
+                                    modelPath,
+                                    (gltf) => {
+                                        // 既存モデル削除
+                                        if (this.currentModel) {
+                                            this.scene.remove(this.currentModel);
+                                        }
+                                        if (this.testCube) {
+                                            this.scene.remove(this.testCube);
+                                        }
+                                        
+                                        this.currentModel = gltf.scene;
+                                        
+                                        // スケール調整
+                                        const box = new THREE.Box3().setFromObject(this.currentModel);
+                                        const size = box.getSize(new THREE.Vector3());
+                                        const scale = 3 / Math.max(size.x, size.y, size.z);
+                                        this.currentModel.scale.multiplyScalar(scale);
+                                        
+                                        // 中央配置
+                                        box.setFromObject(this.currentModel);
+                                        const center = box.getCenter(new THREE.Vector3());
+                                        this.currentModel.position.sub(center);
+                                        
+                                        this.scene.add(this.currentModel);
+                                        
+                                        this.log(`モデル読み込み成功: ${modelPath}`);
+                                        this.updateStatus('statusModel', `モデル: ✅ ${modelPath}`, 'success');
+                                        resolve();
+                                    },
+                                    undefined,
+                                    (error) => {
+                                        this.log(`モデル読み込み失敗: ${modelPath} - ${error.message}`);
+                                        reject(error);
+                                    }
+                                );
+                            });
+                            
+                            // 成功したら終了
+                            break;
+                            
+                        } catch (error) {
+                            this.log(`モデル ${modelPath} 読み込み失敗: ${error.message}`);
+                            continue;
+                        }
+                    }
+                    
+                    if (!this.currentModel) {
+                        throw new Error('すべてのモデル読み込みに失敗');
+                    }
+                    
+                } catch (error) {
+                    this.log(`モデル読み込み失敗: ${error.message}`);
+                    this.updateStatus('statusModel', `モデル: ❌ ${error.message}`, 'error');
+                }
+            }
+            
+            setupEvents() {
+                // コントロール
+                const canvas = this.renderer.domElement;
+                let isMouseDown = false;
+                let mouseX = 0, mouseY = 0;
+                
+                canvas.addEventListener('mousedown', (e) => {
+                    isMouseDown = true;
+                    mouseX = e.clientX;
+                    mouseY = e.clientY;
+                });
+                
+                canvas.addEventListener('mouseup', () => {
+                    isMouseDown = false;
+                });
+                
+                canvas.addEventListener('mousemove', (e) => {
+                    if (!isMouseDown) return;
+                    
+                    const deltaX = e.clientX - mouseX;
+                    const deltaY = e.clientY - mouseY;
+                    
+                    const target = this.currentModel || this.testCube;
+                    if (target) {
+                        target.rotation.y += deltaX * 0.01;
+                        target.rotation.x += deltaY * 0.01;
+                    }
+                    
+                    mouseX = e.clientX;
+                    mouseY = e.clientY;
+                });
+                
+                // ボタンイベント
+                document.getElementById('testWebGL').addEventListener('click', () => {
+                    this.testWebGL();
+                });
+                
+                document.getElementById('testModel').addEventListener('click', () => {
+                    this.loadTestModel();
+                });
+                
+                document.getElementById('rotate').addEventListener('click', () => {
+                    this.autoRotate = !this.autoRotate;
+                    const btn = document.getElementById('rotate');
+                    btn.classList.toggle('active', this.autoRotate);
+                    btn.textContent = this.autoRotate ? '⏸️ 停止' : '🔄 回転';
+                });
+                
+                document.getElementById('reset').addEventListener('click', () => {
+                    this.camera.position.set(5, 3, 5);
+                    this.camera.lookAt(0, 0, 0);
+                });
+                
+                document.getElementById('downloadLog').addEventListener('click', () => {
+                    this.downloadLog();
+                });
+                
+                // リサイズ
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+            
+            downloadLog() {
+                const logContent = this.debugLog.join('\n');
+                const blob = new Blob([logContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'sudachi-debug-log.txt';
+                a.click();
+                
+                URL.revokeObjectURL(url);
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                // 自動回転
+                if (this.autoRotate) {
+                    const target = this.currentModel || this.testCube;
+                    if (target) {
+                        target.rotation.y += 0.01;
+                    }
+                }
+                
+                // FPS計算
+                this.stats.frameCount++;
+                const now = performance.now();
+                if (now >= this.stats.lastTime + 1000) {
+                    this.stats.fps = Math.round((this.stats.frameCount * 1000) / (now - this.stats.lastTime));
+                    this.stats.frameCount = 0;
+                    this.stats.lastTime = now;
+                    
+                    this.updateStatus('statusFPS', `FPS: ${this.stats.fps}`);
+                }
+                
+                // レンダリング
+                try {
+                    this.renderer.render(this.scene, this.camera);
+                } catch (error) {
+                    this.log(`レンダリングエラー: ${error.message}`);
+                }
+            }
+        }
+        
+        // アプリ起動
+        document.addEventListener('DOMContentLoaded', () => {
+            window.debugApp = new SudachiDebugApp();
+        });
+    </script>
+</body>
+</html>

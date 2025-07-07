@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍃 スダチ 3D 軽量版</title>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(45deg, #87CEEB, #4169E1);
+            height: 100vh;
+            color: white;
+            overflow: hidden;
+        }
+        
+        .header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            background: #228B22;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover { background: #32CD32; }
+        button.active { background: #FF6347; }
+        
+        #canvas { width: 100%; height: 100%; cursor: grab; }
+        #canvas:active { cursor: grabbing; }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 200;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>🍃 スダチ 3D</h2>
+        <p>軽量版 - ドラッグで回転</p>
+    </div>
+    
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>読み込み中...</div>
+    </div>
+    
+    <div id="canvas"></div>
+    
+    <div class="controls">
+        <button id="rotate">🔄 自動回転</button>
+        <button id="reset">🎯 リセット</button>
+        <button id="wire">📐 ワイヤー</button>
+        <button id="model">🔄 モデル</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        class SimpleSudachiViewer {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                
+                this.currentModel = null;
+                this.autoRotate = false;
+                this.wireframe = false;
+                this.modelIndex = 0;
+                
+                this.models = [
+                    '../3d_models/sudachi_collection.glb',
+                    '../individual_sudachi/sudachi_1.glb',
+                    '../individual_sudachi/cut_sudachi.glb'
+                ];
+                
+                this.init();
+            }
+            
+            init() {
+                // レンダラー設定
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setClearColor(0x87CEEB);
+                document.getElementById('canvas').appendChild(this.renderer.domElement);
+                
+                // カメラ位置
+                this.camera.position.set(5, 3, 5);
+                
+                // ライト
+                const light = new THREE.DirectionalLight(0xFFFACD, 1.2);
+                light.position.set(15, 20, 10);
+                this.scene.add(light);
+                this.scene.add(new THREE.AmbientLight(0xADD8E6, 0.4));
+                
+                // コントロール
+                this.setupControls();
+                
+                // モデル読み込み
+                this.loadGLTFLoader().then(() => {
+                    this.loadModel(this.models[0]);
+                });
+                
+                // アニメーション
+                this.animate();
+            }
+            
+            async loadGLTFLoader() {
+                return new Promise((resolve) => {
+                    if (typeof THREE.GLTFLoader !== 'undefined') {
+                        resolve();
+                        return;
+                    }
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+                    script.onload = resolve;
+                    document.head.appendChild(script);
+                });
+            }
+            
+            loadModel(path) {
+                const loader = new THREE.GLTFLoader();
+                loader.load(path, (gltf) => {
+                    if (this.currentModel) {
+                        this.scene.remove(this.currentModel);
+                    }
+                    
+                    this.currentModel = gltf.scene;
+                    
+                    // サイズ調整
+                    const box = new THREE.Box3().setFromObject(this.currentModel);
+                    const size = box.getSize(new THREE.Vector3());
+                    const scale = 3 / Math.max(size.x, size.y, size.z);
+                    this.currentModel.scale.multiplyScalar(scale);
+                    
+                    // 中央配置
+                    box.setFromObject(this.currentModel);
+                    const center = box.getCenter(new THREE.Vector3());
+                    this.currentModel.position.sub(center);
+                    
+                    // スダチの深緑色マテリアル適用
+                    this.currentModel.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            // 既存マテリアルをクローンして色を変更
+                            child.material = child.material.clone();
+                            
+                            // メッシュの位置とサイズから色を判定
+                            const geometry = child.geometry;
+                            if (geometry && geometry.attributes.position) {
+                                const positions = geometry.attributes.position.array;
+                                let maxY = -Infinity;
+                                let minY = Infinity;
+                                
+                                // Y座標の範囲を計算
+                                for (let i = 1; i < positions.length; i += 3) {
+                                    const y = positions[i];
+                                    maxY = Math.max(maxY, y);
+                                    minY = Math.min(minY, y);
+                                }
+                                
+                                const yRange = maxY - minY;
+                                const isTopPart = child.position.y > (minY + yRange * 0.7);
+                                
+                                if (isTopPart) {
+                                    // ヘタ部分（てっぺん）- より黄緑
+                                    child.material.color.setRGB(0.08, 0.22, 0.04); // 明るい黄緑
+                                    child.material.emissive.setRGB(0.015, 0.04, 0.008); // 黄緑の発光
+                                } else {
+                                    // 本体部分 - 深緑
+                                    child.material.color.setRGB(0.05, 0.16, 0.03); // 黄緑がかった深緑
+                                    child.material.emissive.setRGB(0.01, 0.03, 0.005); // 黄緑の微かな発光
+                                }
+                            } else {
+                                // デフォルト色（本体部分）
+                                child.material.color.setRGB(0.05, 0.16, 0.03); // 黄緑がかった深緑
+                                child.material.emissive.setRGB(0.01, 0.03, 0.005); // 黄緑の微かな発光
+                            }
+                            
+                            if (child.material.roughness !== undefined) {
+                                child.material.roughness = 0.3; // やや光沢
+                            }
+                            if (child.material.metalness !== undefined) {
+                                child.material.metalness = 0.1; // 微かな金属感
+                            }
+                        }
+                    });
+                    
+                    this.scene.add(this.currentModel);
+                    document.getElementById('loading').style.display = 'none';
+                }, 
+                undefined,
+                (error) => {
+                    console.error('読み込みエラー:', error);
+                    document.querySelector('.loading div:last-child').textContent = '読み込み失敗';
+                });
+            }
+            
+            setupControls() {
+                const canvas = this.renderer.domElement;
+                let isMouseDown = false;
+                let mouseX = 0, mouseY = 0;
+                
+                canvas.addEventListener('mousedown', (e) => {
+                    isMouseDown = true;
+                    mouseX = e.clientX;
+                    mouseY = e.clientY;
+                });
+                
+                canvas.addEventListener('mouseup', () => {
+                    isMouseDown = false;
+                });
+                
+                canvas.addEventListener('mousemove', (e) => {
+                    if (!isMouseDown || !this.currentModel) return;
+                    
+                    const deltaX = e.clientX - mouseX;
+                    const deltaY = e.clientY - mouseY;
+                    
+                    this.currentModel.rotation.y += deltaX * 0.01;
+                    this.currentModel.rotation.x += deltaY * 0.01;
+                    
+                    mouseX = e.clientX;
+                    mouseY = e.clientY;
+                });
+                
+                canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    this.camera.position.multiplyScalar(1 + e.deltaY * 0.001);
+                    this.camera.position.clampLength(2, 10);
+                });
+                
+                // ボタンイベント
+                document.getElementById('rotate').addEventListener('click', () => {
+                    this.autoRotate = !this.autoRotate;
+                    const btn = document.getElementById('rotate');
+                    btn.classList.toggle('active', this.autoRotate);
+                    btn.textContent = this.autoRotate ? '⏸️ 停止' : '🔄 自動回転';
+                });
+                
+                document.getElementById('reset').addEventListener('click', () => {
+                    this.camera.position.set(5, 3, 5);
+                    this.camera.lookAt(0, 0, 0);
+                    if (this.currentModel) {
+                        this.currentModel.rotation.set(0, 0, 0);
+                    }
+                });
+                
+                document.getElementById('wire').addEventListener('click', () => {
+                    this.wireframe = !this.wireframe;
+                    const btn = document.getElementById('wire');
+                    btn.classList.toggle('active', this.wireframe);
+                    btn.textContent = this.wireframe ? '🎨 ソリッド' : '📐 ワイヤー';
+                    
+                    if (this.currentModel) {
+                        this.currentModel.traverse((child) => {
+                            if (child.isMesh) {
+                                child.material.wireframe = this.wireframe;
+                            }
+                        });
+                    }
+                });
+                
+                document.getElementById('model').addEventListener('click', () => {
+                    this.modelIndex = (this.modelIndex + 1) % this.models.length;
+                    document.getElementById('loading').style.display = 'block';
+                    this.loadModel(this.models[this.modelIndex]);
+                });
+                
+                // リサイズ
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                if (this.autoRotate && this.currentModel) {
+                    this.currentModel.rotation.y += 0.01;
+                }
+                
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+        
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            new SimpleSudachiViewer();
+        });
+    </script>
+</body>
+</html>

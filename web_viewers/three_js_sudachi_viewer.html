@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スダチ 3D ビューワー - Three.js</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #87CEEB, #98FB98);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            z-index: 200;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="loading">スダチモデルを読み込み中...</div>
+        
+        <div id="info">
+            <h3>🍃 徳島県産スダチ 3Dモデル</h3>
+            <p><strong>特徴:</strong> 深緑色の香酸柑橘類</p>
+            <p><strong>操作:</strong> マウスドラッグで回転、ホイールでズーム</p>
+            <p><strong>ポリゴン数:</strong> 約14万ポリゴン（各スダチ）</p>
+            <p><strong>テクスチャ:</strong> プロシージャル深緑マテリアル</p>
+        </div>
+        
+        <div id="controls">
+            <h4>モデル選択</h4>
+            <button onclick="loadModel('sudachi_collection.glb')">全体表示</button>
+            <button onclick="loadModel('individual_sudachi/sudachi_1.glb')">スダチ1</button>
+            <button onclick="loadModel('individual_sudachi/sudachi_2.glb')">スダチ2</button>
+            <button onclick="loadModel('individual_sudachi/cut_sudachi.glb')">半分カット</button>
+            <br>
+            <button onclick="resetCamera()">カメラリセット</button>
+            <button onclick="toggleWireframe()">ワイヤーフレーム</button>
+            <button onclick="toggleRotation()">自動回転</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, controls;
+        let currentModel = null;
+        let autoRotate = false;
+        let wireframeMode = false;
+        
+        // シーンの初期化
+        function init() {
+            // シーン作成
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            
+            // カメラ作成
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(5, 5, 5);
+            
+            // レンダラー作成
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('container').appendChild(renderer.domElement);
+            
+            // ライティング設定
+            setupLighting();
+            
+            // コントロール設定（簡易版）
+            setupControls();
+            
+            // 初期モデル読み込み
+            loadModel('sudachi_collection.glb');
+            
+            // アニメーション開始
+            animate();
+            
+            // ウィンドウリサイズ対応
+            window.addEventListener('resize', onWindowResize);
+        }
+        
+        function setupLighting() {
+            // 環境光
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+            
+            // 平行光源
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 10, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            
+            // 補助光
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+            fillLight.position.set(-5, 0, -5);
+            scene.add(fillLight);
+        }
+        
+        function setupControls() {
+            // 簡易マウスコントロール
+            let isMouseDown = false;
+            let mouseX = 0, mouseY = 0;
+            
+            renderer.domElement.addEventListener('mousedown', (event) => {
+                isMouseDown = true;
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+            });
+            
+            renderer.domElement.addEventListener('mouseup', () => {
+                isMouseDown = false;
+            });
+            
+            renderer.domElement.addEventListener('mousemove', (event) => {
+                if (!isMouseDown) return;
+                
+                const deltaX = event.clientX - mouseX;
+                const deltaY = event.clientY - mouseY;
+                
+                if (currentModel) {
+                    currentModel.rotation.y += deltaX * 0.01;
+                    currentModel.rotation.x += deltaY * 0.01;
+                }
+                
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+            });
+            
+            // ズーム
+            renderer.domElement.addEventListener('wheel', (event) => {
+                camera.position.multiplyScalar(1 + event.deltaY * 0.001);
+                camera.position.clampLength(2, 20);
+            });
+        }
+        
+        function loadModel(modelPath) {
+            document.getElementById('loading').style.display = 'block';
+            
+            // 既存モデルを削除
+            if (currentModel) {
+                scene.remove(currentModel);
+            }
+            
+            // GLTFローダー
+            const loader = new THREE.GLTFLoader();
+            
+            loader.load(
+                modelPath,
+                function(gltf) {
+                    currentModel = gltf.scene;
+                    
+                    // モデルのサイズを調整
+                    const box = new THREE.Box3().setFromObject(currentModel);
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxSize = Math.max(size.x, size.y, size.z);
+                    const scale = 3 / maxSize;
+                    currentModel.scale.multiplyScalar(scale);
+                    
+                    // 中央に配置
+                    box.setFromObject(currentModel);
+                    const center = box.getCenter(new THREE.Vector3());
+                    currentModel.position.sub(center);
+                    
+                    // シーンに追加
+                    scene.add(currentModel);
+                    
+                    console.log('モデル読み込み完了:', modelPath);
+                    document.getElementById('loading').style.display = 'none';
+                },
+                function(progress) {
+                    console.log('読み込み進行:', (progress.loaded / progress.total * 100) + '%');
+                },
+                function(error) {
+                    console.error('読み込みエラー:', error);
+                    document.getElementById('loading').innerHTML = 'モデル読み込みエラー: ' + modelPath;
+                }
+            );
+        }
+        
+        function resetCamera() {
+            camera.position.set(5, 5, 5);
+            camera.lookAt(0, 0, 0);
+        }
+        
+        function toggleWireframe() {
+            wireframeMode = !wireframeMode;
+            if (currentModel) {
+                currentModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material.wireframe = wireframeMode;
+                    }
+                });
+            }
+        }
+        
+        function toggleRotation() {
+            autoRotate = !autoRotate;
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // 自動回転
+            if (autoRotate && currentModel) {
+                currentModel.rotation.y += 0.01;
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // 初期化実行
+        init();
+    </script>
+</body>
+</html>

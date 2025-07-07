@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍃 スダチ 3D コレクション | 徳島県特産品を3Dで体験</title>
+    <meta name="description" content="徳島県特産のスダチを高品質3Dで体験できるWebサイト集。基本版からプレミアム版まで、お使いの環境に合わせてお選びください。">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1F4F3F, #2E8B57, #3CB371);
+            background-attachment: fixed;
+            color: #F0FFF0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 60px 0;
+            background: rgba(31, 79, 63, 0.8);
+            backdrop-filter: blur(20px);
+            margin-bottom: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .header h1 {
+            font-size: 48px;
+            font-weight: 300;
+            color: #90EE90;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .header .emoji {
+            font-size: 64px;
+            margin-bottom: 20px;
+            display: block;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .header p {
+            font-size: 20px;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .version-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+
+        .version-card {
+            background: rgba(31, 79, 63, 0.9);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 1px solid rgba(144, 238, 144, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .version-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(144, 238, 144, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .version-card:hover::before {
+            left: 100%;
+        }
+
+        .version-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+        }
+
+        .version-card h3 {
+            font-size: 24px;
+            color: #90EE90;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge.premium {
+            background: linear-gradient(45deg, #FFD700, #FFA500);
+            color: #000;
+        }
+
+        .badge.recommended {
+            background: linear-gradient(45deg, #32CD32, #228B22);
+            color: white;
+        }
+
+        .badge.lightweight {
+            background: linear-gradient(45deg, #87CEEB, #4682B4);
+            color: white;
+        }
+
+        .version-card p {
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+
+        .feature-list {
+            list-style: none;
+            margin-bottom: 25px;
+        }
+
+        .feature-list li {
+            padding: 5px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .feature-list li::before {
+            content: '✓';
+            color: #90EE90;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .launch-btn {
+            display: inline-block;
+            background: linear-gradient(145deg, #228B22, #32CD32);
+            color: white;
+            text-decoration: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(34, 139, 34, 0.3);
+            width: 100%;
+            text-align: center;
+        }
+
+        .launch-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(34, 139, 34, 0.4);
+            background: linear-gradient(145deg, #32CD32, #228B22);
+        }
+
+        .tech-specs {
+            background: rgba(31, 79, 63, 0.8);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            border: 1px solid rgba(144, 238, 144, 0.2);
+        }
+
+        .tech-specs h2 {
+            color: #90EE90;
+            font-size: 28px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .specs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .spec-item {
+            background: rgba(144, 238, 144, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid rgba(144, 238, 144, 0.2);
+        }
+
+        .spec-item h4 {
+            color: #90EE90;
+            margin-bottom: 10px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 40px 0;
+            border-top: 1px solid rgba(144, 238, 144, 0.3);
+            margin-top: 60px;
+        }
+
+        .footer p {
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 32px;
+            }
+            
+            .header .emoji {
+                font-size: 48px;
+            }
+            
+            .version-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <span class="emoji">🍃</span>
+            <h1>スダチ 3D コレクション</h1>
+            <p>徳島県特産の香酸柑橘類スダチを、最新のWeb3D技術で忠実に再現。<br>
+            深緑の美しい質感をリアルタイムで体験できます。</p>
+            <div id="redirect-notice" style="margin-top: 20px; padding: 15px; background: rgba(255, 215, 0, 0.2); border-radius: 10px; border: 1px solid rgba(255, 215, 0, 0.5);">
+                <p style="color: #FFD700; font-weight: bold;">🚀 <span id="countdown">3</span>秒後にプレミアム版に自動移動します...</p>
+                <button onclick="cancelRedirect()" style="background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 8px 16px; border-radius: 5px; cursor: pointer; margin-top: 10px;">キャンセル</button>
+            </div>
+        </header>
+
+        <main>
+            <div class="version-grid">
+                <!-- プレミアム版 -->
+                <div class="version-card">
+                    <h3>
+                        🌟 プレミアム版
+                        <span class="badge premium">Ultra HD</span>
+                    </h3>
+                    <p>最高品質のレンダリングとフル機能を搭載した最上位版。リアルタイムライティング、パフォーマンス監視、高度なエフェクトを体験できます。</p>
+                    
+                    <ul class="feature-list">
+                        <li>Ultra HD レンダリング</li>
+                        <li>リアルタイムライティング</li>
+                        <li>パフォーマンス監視</li>
+                        <li>高度なマテリアル</li>
+                        <li>タッチ操作対応</li>
+                        <li>キーボードショートカット</li>
+                        <li>照明モード切替</li>
+                        <li>アニメーション効果</li>
+                    </ul>
+                    
+                    <a href="web_viewers/sudachi_premium_fixed.html" class="launch-btn">
+                        🚀 プレミアム版を起動（修正版）
+                    </a>
+                    <div style="margin-top: 10px; text-align: center;">
+                        <a href="web_viewers/sudachi_debug.html" style="color: #90EE90; font-size: 12px; text-decoration: underline;">🔧 デバッグ版</a>
+                    </div>
+                </div>
+
+                <!-- 標準版 -->
+                <div class="version-card">
+                    <h3>
+                        🎯 標準版
+                        <span class="badge recommended">推奨</span>
+                    </h3>
+                    <p>バランスの取れた機能とパフォーマンスを提供する推奨版。ほとんどのユーザーに最適な選択肢です。</p>
+                    
+                    <ul class="feature-list">
+                        <li>高品質レンダリング</li>
+                        <li>スムーズなインタラクション</li>
+                        <li>パーティクル効果</li>
+                        <li>モデル切替機能</li>
+                        <li>情報パネル表示</li>
+                        <li>レスポンシブデザイン</li>
+                        <li>美しいUI/UX</li>
+                        <li>ブラウザ最適化</li>
+                    </ul>
+                    
+                    <a href="web_viewers/sudachi_3d_site.html" class="launch-btn">
+                        ⚡ 標準版を起動
+                    </a>
+                </div>
+
+                <!-- 軽量版 -->
+                <div class="version-card">
+                    <h3>
+                        🪶 軽量版
+                        <span class="badge lightweight">高速</span>
+                    </h3>
+                    <p>低スペック環境やモバイルデバイスに最適化された軽量版。素早い読み込みとスムーズな動作を重視しています。</p>
+                    
+                    <ul class="feature-list">
+                        <li>高速読み込み</li>
+                        <li>低GPU要求</li>
+                        <li>モバイル最適化</li>
+                        <li>基本操作対応</li>
+                        <li>軽量ファイルサイズ</li>
+                        <li>古いブラウザ対応</li>
+                        <li>シンプルUI</li>
+                        <li>安定動作</li>
+                    </ul>
+                    
+                    <a href="web_viewers/sudachi_simple_3d.html" class="launch-btn">
+                        💨 軽量版を起動
+                    </a>
+                </div>
+            </div>
+
+            <!-- 技術仕様 -->
+            <section class="tech-specs">
+                <h2>🔧 技術仕様</h2>
+                <div class="specs-grid">
+                    <div class="spec-item">
+                        <h4>📊 3Dモデル</h4>
+                        <p><strong>形式:</strong> glTF 2.0 / GLB</p>
+                        <p><strong>ポリゴン数:</strong> 8K〜140K</p>
+                        <p><strong>テクスチャ:</strong> プロシージャル</p>
+                        <p><strong>品質:</strong> 写真品質</p>
+                    </div>
+                    
+                    <div class="spec-item">
+                        <h4>🎨 レンダリング</h4>
+                        <p><strong>エンジン:</strong> Three.js r128</p>
+                        <p><strong>手法:</strong> PBR (物理ベース)</p>
+                        <p><strong>照明:</strong> リアルタイム</p>
+                        <p><strong>影:</strong> PCF ソフトシャドウ</p>
+                    </div>
+                    
+                    <div class="spec-item">
+                        <h4>🌈 色彩</h4>
+                        <p><strong>基本色:</strong> 極深緑</p>
+                        <p><strong>カラー:</strong> RGB(0.05, 0.16, 0.03)</p>
+                        <p><strong>質感:</strong> マット仕上げ</p>
+                        <p><strong>参考:</strong> 実物写真ベース</p>
+                    </div>
+                    
+                    <div class="spec-item">
+                        <h4>💻 システム要件</h4>
+                        <p><strong>ブラウザ:</strong> Chrome 90+</p>
+                        <p><strong>WebGL:</strong> 2.0対応</p>
+                        <p><strong>GPU:</strong> 中程度以上推奨</p>
+                        <p><strong>RAM:</strong> 4GB以上</p>
+                    </div>
+                    
+                    <div class="spec-item">
+                        <h4>📱 デバイス対応</h4>
+                        <p><strong>PC:</strong> Windows/Mac/Linux</p>
+                        <p><strong>モバイル:</strong> iOS/Android</p>
+                        <p><strong>タブレット:</strong> iPad/Android</p>
+                        <p><strong>操作:</strong> マウス/タッチ</p>
+                    </div>
+                    
+                    <div class="spec-item">
+                        <h4>🍃 スダチ情報</h4>
+                        <p><strong>産地:</strong> 徳島県</p>
+                        <p><strong>サイズ:</strong> 直径3-4cm</p>
+                        <p><strong>重量:</strong> 25-40g</p>
+                        <p><strong>用途:</strong> 料理の薬味</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 使用方法 -->
+            <section class="tech-specs">
+                <h2>🎮 使用方法</h2>
+                <div class="specs-grid">
+                    <div class="spec-item">
+                        <h4>🖱️ マウス操作</h4>
+                        <p><strong>回転:</strong> ドラッグ</p>
+                        <p><strong>ズーム:</strong> ホイール</p>
+                        <p><strong>リセット:</strong> ボタンクリック</p>
+                    </div>
+                    
+                    <div class="spec-item">
+                        <h4>📱 タッチ操作</h4>
+                        <p><strong>回転:</strong> スワイプ</p>
+                        <p><strong>ズーム:</strong> ピンチ</p>
+                        <p><strong>機能:</strong> ボタンタップ</p>
+                    </div>
+                    
+                    <div class="spec-item">
+                        <h4>⌨️ キーボード</h4>
+                        <p><strong>R:</strong> リセット</p>
+                        <p><strong>A:</strong> 自動回転</p>
+                        <p><strong>W:</strong> ワイヤーフレーム</p>
+                        <p><strong>M:</strong> モデル切替</p>
+                    </div>
+                    
+                    <div class="spec-item">
+                        <h4>🔧 機能</h4>
+                        <p><strong>自動回転:</strong> ON/OFF</p>
+                        <p><strong>モデル切替:</strong> 6種類</p>
+                        <p><strong>照明調整:</strong> 3モード</p>
+                        <p><strong>速度調整:</strong> スライダー</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>🍃 スダチ 3D コレクション - 徳島県特産品の3D体験サイト</p>
+            <p>最新のWeb3D技術で、本物のスダチの質感をお楽しみください。</p>
+            <p><small>※ 高品質版はWebGL対応ブラウザと中程度以上のGPUが必要です</small></p>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(144, 238, 144, 0.3);">
+                <h3 style="color: #90EE90; margin-bottom: 15px;">📁 関連ファイル</h3>
+                <p><strong>開発者向け:</strong> <a href="documentation/README.md" style="color: #90EE90;">README.md</a> - 詳細な技術情報とAPI</p>
+                <p><strong>ビューワー:</strong> <a href="web_viewers/three_js_sudachi_viewer.html" style="color: #90EE90;">基本ビューワー</a> - シンプルな表示用</p>
+                <p><strong>モデルファイル:</strong> individual_sudachi/ フォルダ - 個別3Dモデル</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // 自動リダイレクト機能 - 最初のリンク先（プレミアム版）に自動的に移動
+        let redirectTimer;
+        let countdownTimer;
+        let redirectCancelled = false;
+        
+        function autoRedirect() {
+            let countdown = 3;
+            const countdownElement = document.getElementById('countdown');
+            
+            // カウントダウン更新
+            countdownTimer = setInterval(() => {
+                countdown--;
+                if (countdownElement) {
+                    countdownElement.textContent = countdown;
+                }
+                
+                if (countdown <= 0) {
+                    clearInterval(countdownTimer);
+                }
+            }, 1000);
+            
+            // 3秒後に自動的にプレミアム版に移動
+            redirectTimer = setTimeout(() => {
+                if (!redirectCancelled) {
+                    window.location.href = 'web_viewers/sudachi_premium_fixed.html';
+                }
+            }, 3000);
+        }
+        
+        function cancelRedirect() {
+            redirectCancelled = true;
+            clearTimeout(redirectTimer);
+            clearInterval(countdownTimer);
+            
+            const notice = document.getElementById('redirect-notice');
+            if (notice) {
+                notice.style.display = 'none';
+            }
+        }
+        
+        // ページ読み込み時のアニメーション
+        document.addEventListener('DOMContentLoaded', () => {
+            // 自動リダイレクトを開始
+            autoRedirect();
+            const cards = document.querySelectorAll('.version-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(50px)';
+                
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 200);
+            });
+            
+            // パフォーマンス検出とレコメンデーション
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            
+            if (gl) {
+                const renderer = gl.getParameter(gl.RENDERER);
+                console.log('🎮 GPU:', renderer);
+                
+                // 低スペックデバイスの検出
+                const isLowSpec = /Intel.*HD|Mali|Adreno [0-9][0-9][0-9]/.test(renderer);
+                
+                if (isLowSpec) {
+                    // 軽量版を推奨
+                    const lightweightCard = document.querySelector('.version-card:last-child');
+                    const badge = lightweightCard.querySelector('.badge');
+                    badge.textContent = '推奨';
+                    badge.className = 'badge recommended';
+                }
+            }
+            
+            // 使用統計（開発用）
+            if (window.localStorage) {
+                const visits = parseInt(localStorage.getItem('sudachi-visits') || '0') + 1;
+                localStorage.setItem('sudachi-visits', visits.toString());
+                console.log(`🍃 スダチサイト訪問回数: ${visits}`);
+            }
+        });
+        
+        // リンククリック時の統計
+        document.querySelectorAll('.launch-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const version = e.target.textContent.includes('プレミアム') ? 'premium' : 
+                              e.target.textContent.includes('軽量') ? 'lightweight' : 'standard';
+                console.log(`🚀 起動: ${version}`);
+            });
+        });
+    </script>
+</body>
+</html>

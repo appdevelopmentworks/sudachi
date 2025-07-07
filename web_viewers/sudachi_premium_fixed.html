@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍃 スダチ 3D プレミアム版（修正版）</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #87CEEB 0%, #4169E1 25%, #1E90FF 50%, #00BFFF 75%, #87CEFA 100%);
+            background-attachment: fixed;
+            color: #F0FFF0;
+            overflow: hidden;
+        }
+        
+        .header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(31, 79, 63, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        
+        .header h1 {
+            color: #90EE90;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            opacity: 0.8;
+            font-size: 14px;
+        }
+        
+        #viewport {
+            width: 100%;
+            height: 100vh;
+            cursor: grab;
+        }
+        
+        #viewport:active {
+            cursor: grabbing;
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(31, 79, 63, 0.9);
+            backdrop-filter: blur(15px);
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .control-button {
+            background: linear-gradient(145deg, #228B22, #32CD32);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(34, 139, 34, 0.3);
+        }
+        
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(34, 139, 34, 0.4);
+        }
+        
+        .control-button.active {
+            background: linear-gradient(145deg, #FF6347, #FF4500);
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 200;
+            background: rgba(31, 79, 63, 0.9);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(15px);
+        }
+        
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(144, 238, 144, 0.3);
+            border-top: 4px solid #90EE90;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #F0FFF0;
+        }
+        
+        .speed-slider {
+            width: 80px;
+            height: 6px;
+            background: #2F4F4F;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        @media (max-width: 768px) {
+            .controls {
+                bottom: 20px;
+                left: 20px;
+                right: 20px;
+                transform: none;
+                padding: 15px;
+            }
+            
+            .control-button {
+                padding: 10px 15px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🍃 スダチ 3D プレミアム版</h1>
+        <p>修正版 - 高品質3Dモデル体験</p>
+    </div>
+    
+    <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">スダチモデルを読み込み中...</div>
+    </div>
+    
+    <div id="viewport"></div>
+    
+    <div class="controls">
+        <button class="control-button" id="autoRotateBtn">🔄 自動回転</button>
+        <button class="control-button" id="resetBtn">🎯 リセット</button>
+        <button class="control-button" id="wireframeBtn">📐 ワイヤー</button>
+        <button class="control-button" id="modelBtn">🔄 モデル切替</button>
+        <div class="speed-control">
+            <span>速度:</span>
+            <input type="range" id="speedSlider" class="speed-slider" min="0" max="2" step="0.1" value="1">
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        // GLTFLoader を手動で追加
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+        document.head.appendChild(script);
+
+        class SudachiPremiumApp {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.currentModel = null;
+                this.autoRotate = false;
+                this.rotationSpeed = 1;
+                this.wireframeMode = false;
+                this.currentModelIndex = 0;
+                
+                this.modelFiles = [
+                    '../3d_models/sudachi_collection.glb',
+                    '../individual_sudachi/sudachi_1.glb',
+                    '../individual_sudachi/sudachi_2.glb',
+                    '../individual_sudachi/sudachi_3.glb',
+                    '../individual_sudachi/cut_sudachi.glb'
+                ];
+                
+                this.init();
+            }
+            
+            init() {
+                this.createScene();
+                this.setupLighting();
+                this.setupControls();
+                this.setupEventListeners();
+                this.startAnimationLoop();
+                
+                // GLTFLoaderの読み込みを待ってからモデルを読み込み
+                setTimeout(() => {
+                    this.loadModel(this.modelFiles[0]);
+                }, 1000);
+            }
+            
+            createScene() {
+                // シーン作成
+                this.scene = new THREE.Scene();
+                // 青空のグラデーション背景
+                this.scene.background = new THREE.Color(0x87CEEB);
+                
+                // 空の雲のような効果を追加
+                const skyGeometry = new THREE.SphereGeometry(50, 32, 32);
+                const skyMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        colorTop: { value: new THREE.Color(0x87CEEB) },
+                        colorBottom: { value: new THREE.Color(0x1E90FF) }
+                    },
+                    vertexShader: `
+                        varying vec3 vWorldPosition;
+                        void main() {
+                            vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
+                            vWorldPosition = worldPosition.xyz;
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform vec3 colorTop;
+                        uniform vec3 colorBottom;
+                        varying vec3 vWorldPosition;
+                        void main() {
+                            float h = normalize( vWorldPosition ).y;
+                            gl_FragColor = vec4( mix( colorBottom, colorTop, max( pow( max( h, 0.0 ), 0.6 ), 0.0 ) ), 1.0 );
+                        }
+                    `,
+                    side: THREE.BackSide
+                });
+                const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+                this.scene.add(sky);
+                
+                // カメラ作成
+                this.camera = new THREE.PerspectiveCamera(
+                    75, 
+                    window.innerWidth / window.innerHeight, 
+                    0.1, 
+                    1000
+                );
+                this.camera.position.set(6, 4, 6);
+                
+                // レンダラー作成
+                this.renderer = new THREE.WebGLRenderer({ 
+                    antialias: true,
+                    alpha: true 
+                });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.2;
+                
+                document.getElementById('viewport').appendChild(this.renderer.domElement);
+            }
+            
+            setupLighting() {
+                // 環境光（青空に合わせて調整）
+                const ambientLight = new THREE.AmbientLight(0xADD8E6, 0.4);
+                this.scene.add(ambientLight);
+                
+                // 太陽光（メインライト）
+                this.directionalLight = new THREE.DirectionalLight(0xFFFACD, 1.2);
+                this.directionalLight.position.set(15, 20, 10);
+                this.directionalLight.castShadow = true;
+                this.directionalLight.shadow.mapSize.width = 2048;
+                this.directionalLight.shadow.mapSize.height = 2048;
+                this.scene.add(this.directionalLight);
+                
+                // 空からの反射光
+                this.rimLight = new THREE.DirectionalLight(0x87CEEB, 0.6);
+                this.rimLight.position.set(-10, 5, -10);
+                this.scene.add(this.rimLight);
+                
+                // 地面からの反射光
+                const groundLight = new THREE.DirectionalLight(0xF0F8FF, 0.3);
+                groundLight.position.set(0, -15, 0);
+                this.scene.add(groundLight);
+            }
+            
+            setupControls() {
+                let isMouseDown = false;
+                let mouseX = 0, mouseY = 0;
+                let targetRotationX = 0, targetRotationY = 0;
+                
+                const viewport = document.getElementById('viewport');
+                
+                viewport.addEventListener('mousedown', (event) => {
+                    isMouseDown = true;
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                });
+                
+                viewport.addEventListener('mouseup', () => {
+                    isMouseDown = false;
+                });
+                
+                viewport.addEventListener('mouseleave', () => {
+                    isMouseDown = false;
+                });
+                
+                viewport.addEventListener('mousemove', (event) => {
+                    if (!isMouseDown || !this.currentModel) return;
+                    
+                    const deltaX = event.clientX - mouseX;
+                    const deltaY = event.clientY - mouseY;
+                    
+                    targetRotationY += deltaX * 0.01;
+                    targetRotationX += deltaY * 0.01;
+                    
+                    targetRotationX = Math.max(-Math.PI/2, Math.min(Math.PI/2, targetRotationX));
+                    
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                });
+                
+                // ズーム
+                viewport.addEventListener('wheel', (event) => {
+                    event.preventDefault();
+                    const zoom = 1 + event.deltaY * 0.001;
+                    this.camera.position.multiplyScalar(zoom);
+                    this.camera.position.clampLength(3, 15);
+                });
+                
+                // スムーズ回転の適用
+                const applySmoothRotation = () => {
+                    if (this.currentModel) {
+                        this.currentModel.rotation.y += (targetRotationY - this.currentModel.rotation.y) * 0.1;
+                        this.currentModel.rotation.x += (targetRotationX - this.currentModel.rotation.x) * 0.1;
+                    }
+                    requestAnimationFrame(applySmoothRotation);
+                };
+                applySmoothRotation();
+            }
+            
+            setupEventListeners() {
+                // 自動回転ボタン
+                document.getElementById('autoRotateBtn').addEventListener('click', () => {
+                    this.toggleAutoRotate();
+                });
+                
+                // リセットボタン
+                document.getElementById('resetBtn').addEventListener('click', () => {
+                    this.resetCamera();
+                });
+                
+                // ワイヤーフレームボタン
+                document.getElementById('wireframeBtn').addEventListener('click', () => {
+                    this.toggleWireframe();
+                });
+                
+                // モデル切替ボタン
+                document.getElementById('modelBtn').addEventListener('click', () => {
+                    this.switchModel();
+                });
+                
+                // 速度スライダー
+                document.getElementById('speedSlider').addEventListener('input', (event) => {
+                    this.rotationSpeed = parseFloat(event.target.value);
+                });
+                
+                // ウィンドウリサイズ
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+            
+            loadModel(modelPath) {
+                document.getElementById('loading').style.display = 'block';
+                
+                // 既存モデルを削除
+                if (this.currentModel) {
+                    this.scene.remove(this.currentModel);
+                }
+                
+                // GLTFLoaderを使用してモデルを読み込み
+                setTimeout(() => {
+                    if (typeof THREE.GLTFLoader === 'undefined') {
+                        console.error('GLTFLoader not loaded yet, retrying...');
+                        this.loadModel(modelPath);
+                        return;
+                    }
+                    
+                    const loader = new THREE.GLTFLoader();
+                    
+                    loader.load(
+                        modelPath,
+                        (gltf) => {
+                            this.currentModel = gltf.scene;
+                            
+                            // モデルスケール調整
+                            const box = new THREE.Box3().setFromObject(this.currentModel);
+                            const size = box.getSize(new THREE.Vector3());
+                            const maxSize = Math.max(size.x, size.y, size.z);
+                            const scale = 4 / maxSize;
+                            this.currentModel.scale.multiplyScalar(scale);
+                            
+                            // 中央配置
+                            box.setFromObject(this.currentModel);
+                            const center = box.getCenter(new THREE.Vector3());
+                            this.currentModel.position.sub(center);
+                            
+                            // スダチの深緑色マテリアル適用
+                            this.currentModel.traverse((child) => {
+                                if (child.isMesh) {
+                                    child.castShadow = true;
+                                    child.receiveShadow = true;
+                                    
+                                    // 深緑のスダチマテリアル
+                                    if (child.material) {
+                                        // 既存マテリアルをクローンして色を変更
+                                        child.material = child.material.clone();
+                                        
+                                        // メッシュの位置とサイズから色を判定
+                                        const geometry = child.geometry;
+                                        if (geometry && geometry.attributes.position) {
+                                            const positions = geometry.attributes.position.array;
+                                            let maxY = -Infinity;
+                                            let minY = Infinity;
+                                            
+                                            // Y座標の範囲を計算
+                                            for (let i = 1; i < positions.length; i += 3) {
+                                                const y = positions[i];
+                                                maxY = Math.max(maxY, y);
+                                                minY = Math.min(minY, y);
+                                            }
+                                            
+                                            const yRange = maxY - minY;
+                                            const isTopPart = child.position.y > (minY + yRange * 0.7);
+                                            
+                                            if (isTopPart) {
+                                                // ヘタ部分（てっぺん）- より黄緑
+                                                child.material.color.setRGB(0.08, 0.22, 0.04); // 明るい黄緑
+                                                child.material.emissive.setRGB(0.015, 0.04, 0.008); // 黄緑の発光
+                                            } else {
+                                                // 本体部分 - 深緑
+                                                child.material.color.setRGB(0.05, 0.16, 0.03); // 黄緑がかった深緑
+                                                child.material.emissive.setRGB(0.01, 0.03, 0.005); // 黄緑の微かな発光
+                                            }
+                                        } else {
+                                            // デフォルト色（本体部分）
+                                            child.material.color.setRGB(0.05, 0.16, 0.03); // 黄緑がかった深緑
+                                            child.material.emissive.setRGB(0.01, 0.03, 0.005); // 黄緑の微かな発光
+                                        }
+                                        
+                                        child.material.roughness = 0.3; // やや光沢
+                                        child.material.metalness = 0.1; // 微かな金属感
+                                        child.material.envMapIntensity = 0.8;
+                                        
+                                        // ノーマルマップ強度調整
+                                        if (child.material.normalMap) {
+                                            child.material.normalScale = new THREE.Vector2(1.2, 1.2);
+                                        }
+                                    }
+                                }
+                            });
+                            
+                            this.scene.add(this.currentModel);
+                            
+                            console.log('✅ モデル読み込み完了:', modelPath);
+                            document.getElementById('loading').style.display = 'none';
+                        },
+                        (progress) => {
+                            const percent = (progress.loaded / progress.total * 100);
+                            document.querySelector('.loading-text').textContent = 
+                                `読み込み中... ${Math.round(percent)}%`;
+                        },
+                        (error) => {
+                            console.error('❌ モデル読み込みエラー:', error);
+                            document.querySelector('.loading-text').textContent = 
+                                'モデル読み込みに失敗しました';
+                        }
+                    );
+                }, 1000);
+            }
+            
+            toggleAutoRotate() {
+                this.autoRotate = !this.autoRotate;
+                const btn = document.getElementById('autoRotateBtn');
+                if (this.autoRotate) {
+                    btn.classList.add('active');
+                    btn.innerHTML = '⏸️ 停止';
+                } else {
+                    btn.classList.remove('active');
+                    btn.innerHTML = '🔄 自動回転';
+                }
+            }
+            
+            resetCamera() {
+                this.camera.position.set(6, 4, 6);
+                this.camera.lookAt(0, 0, 0);
+                if (this.currentModel) {
+                    this.currentModel.rotation.set(0, 0, 0);
+                }
+            }
+            
+            toggleWireframe() {
+                this.wireframeMode = !this.wireframeMode;
+                const btn = document.getElementById('wireframeBtn');
+                
+                if (this.currentModel) {
+                    this.currentModel.traverse((child) => {
+                        if (child.isMesh) {
+                            child.material.wireframe = this.wireframeMode;
+                        }
+                    });
+                }
+                
+                if (this.wireframeMode) {
+                    btn.classList.add('active');
+                    btn.innerHTML = '🎨 ソリッド';
+                } else {
+                    btn.classList.remove('active');
+                    btn.innerHTML = '📐 ワイヤー';
+                }
+            }
+            
+            switchModel() {
+                this.currentModelIndex = (this.currentModelIndex + 1) % this.modelFiles.length;
+                this.loadModel(this.modelFiles[this.currentModelIndex]);
+            }
+            
+            startAnimationLoop() {
+                const animate = () => {
+                    requestAnimationFrame(animate);
+                    
+                    // 自動回転
+                    if (this.autoRotate && this.currentModel) {
+                        this.currentModel.rotation.y += 0.01 * this.rotationSpeed;
+                        this.currentModel.rotation.x += 0.005 * this.rotationSpeed;
+                    }
+                    
+                    // カメラの軽微な浮遊効果
+                    const time = Date.now() * 0.001;
+                    this.camera.position.y += Math.sin(time * 0.5) * 0.02;
+                    
+                    this.renderer.render(this.scene, this.camera);
+                };
+                
+                animate();
+            }
+        }
+        
+        // アプリケーション初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 互換性チェック
+            if (!window.WebGLRenderingContext) {
+                alert('お使いのブラウザはWebGLに対応していません。');
+                return;
+            }
+            
+            // アプリ起動
+            window.sudachiApp = new SudachiPremiumApp();
+            
+            // デバッグ情報
+            console.log('🍃 スダチ 3D プレミアム版（修正版）');
+            console.log('Three.js Version:', THREE.REVISION);
+            console.log('WebGL Support:', !!window.WebGLRenderingContext);
+            
+            // キーボードショートカット
+            document.addEventListener('keydown', (e) => {
+                if (!window.sudachiApp) return;
+                
+                switch(e.key.toLowerCase()) {
+                    case 'r':
+                        e.preventDefault();
+                        window.sudachiApp.resetCamera();
+                        break;
+                    case 'a':
+                        e.preventDefault();
+                        window.sudachiApp.toggleAutoRotate();
+                        break;
+                    case 'w':
+                        e.preventDefault();
+                        window.sudachiApp.toggleWireframe();
+                        break;
+                    case 'm':
+                        e.preventDefault();
+                        window.sudachiApp.switchModel();
+                        break;
+                    case ' ':
+                        e.preventDefault();
+                        window.sudachiApp.toggleAutoRotate();
+                        break;
+                }
+            });
+            
+            // エラーハンドリング
+            window.addEventListener('error', (e) => {
+                console.error('Global Error:', e.error);
+                if (window.sudachiApp) {
+                    document.querySelector('.loading-text').textContent = '予期しないエラーが発生しました';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
